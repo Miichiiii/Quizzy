@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Interaktives Quizspiel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+    }
+    #quiz-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    #question-area {
+      margin: 20px 0;
+      font-size: 1.2em;
+    }
+    #options {
+      margin: 20px 0;
+    }
+    .option-btn {
+      display: block;
+      width: 100%;
+      margin: 5px 0;
+      padding: 10px;
+      font-size: 1em;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #eee;
+      cursor: pointer;
+    }
+    .option-btn:hover {
+      background: #ddd;
+    }
+    #answer-input {
+      padding: 8px;
+      font-size: 1em;
+      width: calc(100% - 16px);
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    #submit-answer {
+      background-color: #28a745;
+      color: #fff;
+    }
+    #next-question {
+      background-color: #007bff;
+      color: #fff;
+    }
+    #restart-quiz {
+      background-color: #dc3545;
+      color: #fff;
+      display: none;
+    }
+    #feedback {
+      margin: 15px 0;
+      font-weight: bold;
+    }
+    #scoreboard {
+      text-align: right;
+      font-size: 1.1em;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div id="quiz-container">
+    <h1>Interaktives Quizspiel</h1>
+    <div id="scoreboard">Punkte: <span id="score">0</span></div>
+    <div id="question-area">
+      <!-- Hier wird die Frage dynamisch eingefügt -->
+      <p id="question-text"></p>
+    </div>
+    <div id="options">
+      <!-- Für Multiple-Choice-Fragen werden hier Buttons erstellt -->
+    </div>
+    <div id="answer-area">
+      <!-- Für Freitextantworten (z.B. bei Rechenaufgaben) -->
+      <input type="text" id="answer-input" placeholder="Deine Antwort">
+    </div>
+    <div id="feedback"></div>
+    <div id="controls">
+      <button id="submit-answer">Antwort absenden</button>
+      <button id="next-question" style="display:none;">Nächste Frage</button>
+      <button id="restart-quiz">Quiz neu starten</button>
+    </div>
+  </div>
+
+  <script>
+    /* Quiz-Logik und State-Verwaltung */
+    let score = 0;
+    let currentQuestion = {};
+    let questionCount = 0;
+    const maxQuestions = 10; // Anzahl der Fragen pro Quiz
+
+// Beispiel-Fragenbank für Multiple-Choice-Fragen (40 Fragen)
+const mcQuestions = [
+  {
+    text: "1. Was ist Java?",
+    options: [
+      "Eine Programmiersprache",
+      "Ein Betriebssystem",
+      "Eine Datenbank",
+      "Ein Webbrowser"
+    ],
+    correct: "Eine Programmiersprache",
+    hint: "Java ist eine objektorientierte, plattformunabhängige Sprache."
+  },
+  {
+    text: "2. Was versteht man unter der JVM?",
+    options: [
+      "Java Virtual Machine",
+      "Java Variable Method",
+      "Java Visual Module",
+      "Java Version Manager"
+    ],
+    correct: "Java Virtual Machine",
+    hint: "Die JVM führt den Bytecode von Java-Anwendungen aus."
+  },
+  {
+    text: "3. Was ist der Unterschied zwischen JDK und JRE?",
+    options: [
+      "JDK enthält den Compiler, JRE nicht",
+      "JRE enthält den Compiler, JDK nicht",
+      "Beide sind identisch",
+      "JDK ist für Server, JRE für Desktop"
+    ],
+    correct: "JDK enthält den Compiler, JRE nicht",
+    hint: "Das Java Development Kit (JDK) ist für Entwickler gedacht, während die Java Runtime Environment (JRE) nur zum Ausführen benötigt wird."
+  },
+  {
+    text: "4. Welche der folgenden Datentypen sind primitive Datentypen in Java?",
+    options: [
+      "int, boolean, char",
+      "String, Integer, Boolean",
+      "Array, List, Map",
+      "Class, Object, Interface"
+    ],
+    correct: "int, boolean, char",
+    hint: "Primitive Datentypen werden direkt vom Compiler unterstützt."
+  },
+  {
+    text: "5. Was ist eine Klasse in Java?",
+    options: [
+      "Ein Bauplan für Objekte",
+      "Ein Datentyp für Zahlen",
+      "Eine Art von Methode",
+      "Ein Java-Paket"
+    ],
+    correct: "Ein Bauplan für Objekte",
+    hint: "Klassen definieren Eigenschaften (Attribute) und Verhalten (Methoden) von Objekten."
+  },
+  {
+    text: "6. Was ist ein Objekt in Java?",
+    options: [
+      "Eine Instanz einer Klasse",
+      "Eine Variable",
+      "Ein Methodenaufruf",
+      "Ein Paket"
+    ],
+    correct: "Eine Instanz einer Klasse",
+    hint: "Objekte werden anhand von Klassen erstellt."
+  },
+  {
+    text: "7. Was bedeutet OOP?",
+    options: [
+      "Objektorientierte Programmierung",
+      "Operationale Optimierung",
+      "Objektive Ordnungsprinzipien",
+      "Organisierte Objektprogrammierung"
+    ],
+    correct: "Objektorientierte Programmierung",
+    hint: "OOP ist ein Paradigma, das den Code in Objekte und Klassen strukturiert."
+  },
+  {
+    text: "8. Welche Prinzipien gehören zur objektorientierten Programmierung?",
+    options: [
+      "Vererbung, Kapselung, Polymorphismus, Abstraktion",
+      "Prozeduralität, Modularität, Wiederverwendbarkeit",
+      "Statische und dynamische Typisierung",
+      "Synchronisation und Parallelität"
+    ],
+    correct: "Vererbung, Kapselung, Polymorphismus, Abstraktion",
+    hint: "Diese vier Prinzipien bilden das Fundament der OOP."
+  },
+  {
+    text: "9. Was versteht man unter Vererbung in Java?",
+    options: [
+      "Eine Klasse erbt Eigenschaften einer anderen Klasse",
+      "Ein Objekt erbt Methoden einer Klasse",
+      "Eine Methode überschreibt eine andere",
+      "Ein Package erbt Funktionen von einem anderen"
+    ],
+    correct: "Eine Klasse erbt Eigenschaften einer anderen Klasse",
+    hint: "Vererbung ermöglicht Code-Wiederverwendung und Hierarchien."
+  },
+  {
+    text: "10. Was ist Polymorphismus in Java?",
+    options: [
+      "Die Fähigkeit von Methoden, unterschiedlich zu reagieren",
+      "Das Erben von mehreren Klassen",
+      "Die Beschränkung von Variablen",
+      "Ein Design-Pattern"
+    ],
+    correct: "Die Fähigkeit von Methoden, unterschiedlich zu reagieren",
+    hint: "Polymorphismus erlaubt es, dass eine Methode in verschiedenen Klassen unterschiedlich implementiert wird."
+  },
+  {
+    text: "11. Was ist Abstraktion in Java?",
+    options: [
+      "Das Verbergen von komplexen Implementierungen",
+      "Das Erben von Eigenschaften",
+      "Das Überschreiben von Methoden",
+      "Das Kopieren von Code"
+    ],
+    correct: "Das Verbergen von komplexen Implementierungen",
+    hint: "Abstraktion hilft, die Komplexität zu reduzieren, indem unwichtige Details ausgeblendet werden."
+  },
+  {
+    text: "12. Was ist ein Interface in Java?",
+    options: [
+      "Ein Vertrag, der Methoden ohne Implementierung definiert",
+      "Eine Klasse mit vollständiger Implementierung",
+      "Ein Datentyp für Zahlen",
+      "Ein GUI-Element"
+    ],
+    correct: "Ein Vertrag, der Methoden ohne Implementierung definiert",
+    hint: "Interfaces legen fest, welche Methoden eine implementierende Klasse bereitstellen muss."
+  },
+  {
+    text: "13. Was ist ein Konstruktor in Java?",
+    options: [
+      "Eine spezielle Methode zur Initialisierung von Objekten",
+      "Eine normale Methode",
+      "Ein Schlüsselwort",
+      "Eine Art von Variable"
+    ],
+    correct: "Eine spezielle Methode zur Initialisierung von Objekten",
+    hint: "Konstruktoren haben denselben Namen wie die Klasse und werden beim Erstellen eines Objekts aufgerufen."
+  },
+  {
+    text: "14. Was ist Method Overloading?",
+    options: [
+      "Mehrere Methoden mit gleichem Namen, aber unterschiedlichen Parametern",
+      "Methoden mit demselben Namen und denselben Parametern",
+      "Das Überschreiben einer Methode in einer Unterklasse",
+      "Die Implementierung von Methoden in Interfaces"
+    ],
+    correct: "Mehrere Methoden mit gleichem Namen, aber unterschiedlichen Parametern",
+    hint: "Overloading ermöglicht es, dieselbe Methode für verschiedene Eingaben zu verwenden."
+  },
+  {
+    text: "15. Was versteht man unter Method Overriding?",
+    options: [
+      "Eine Methode in einer Unterklasse ersetzt die Methode der Oberklasse",
+      "Mehrere Methoden mit gleichem Namen in derselben Klasse",
+      "Das Erzeugen von Methoden mit verschiedenen Rückgabetypen",
+      "Das Entfernen von Methoden"
+    ],
+    correct: "Eine Methode in einer Unterklasse ersetzt die Methode der Oberklasse",
+    hint: "Overriding ermöglicht es, eine geerbte Methode anzupassen."
+  },
+  {
+    text: "16. Was ist Exception Handling in Java?",
+    options: [
+      "Der Prozess, Fehler im Programm abzufangen und zu behandeln",
+      "Das Kompilieren von Code",
+      "Das Erstellen von Klassen",
+      "Das Erben von Eigenschaften"
+    ],
+    correct: "Der Prozess, Fehler im Programm abzufangen und zu behandeln",
+    hint: "try, catch und finally sind zentrale Schlüsselwörter für Exception Handling."
+  },
+  {
+    text: "17. Was ist der Unterschied zwischen checked und unchecked Exceptions?",
+    options: [
+      "Checked Exceptions müssen behandelt werden, unchecked nicht",
+      "Unchecked Exceptions müssen behandelt werden, checked nicht",
+      "Beide sind gleich",
+      "Checked Exceptions treten nur in Webanwendungen auf"
+    ],
+    correct: "Checked Exceptions müssen behandelt werden, unchecked nicht",
+    hint: "Der Compiler erzwingt die Behandlung von checked Exceptions."
+  },
+  {
+    text: "18. Was ist ein Package in Java?",
+    options: [
+      "Eine Sammlung von Klassen",
+      "Ein einzelnes Objekt",
+      "Eine Methode",
+      "Ein Interface"
+    ],
+    correct: "Eine Sammlung von Klassen",
+    hint: "Pakete helfen, den Code logisch zu organisieren und Namenskonflikte zu vermeiden."
+  },
+  {
+    text: "19. Was ist ein Servlet?",
+    options: [
+      "Eine Java-Klasse zur Erstellung von Webanwendungen",
+      "Ein Java-Compiler",
+      "Ein Datenbank-Managementsystem",
+      "Ein HTML-Element"
+    ],
+    correct: "Eine Java-Klasse zur Erstellung von Webanwendungen",
+    hint: "Servlets verarbeiten HTTP-Anfragen und -Antworten auf einem Webserver."
+  },
+  {
+    text: "20. Was ist JSP (JavaServer Pages)?",
+    options: [
+      "Eine Technologie zur dynamischen Erstellung von HTML im Java-Umfeld",
+      "Ein Framework für Desktop-Anwendungen",
+      "Eine Programmiersprache",
+      "Ein Datenbanksystem"
+    ],
+    correct: "Eine Technologie zur dynamischen Erstellung von HTML im Java-Umfeld",
+    hint: "JSP ermöglicht es, Java-Code in HTML-Seiten einzubetten."
+  },
+  {
+    text: "21. Was ist der Unterschied zwischen '==' und equals() in Java?",
+    options: [
+      "'==' vergleicht Referenzen, equals() vergleicht Inhalte",
+      "'==' vergleicht Inhalte, equals() vergleicht Referenzen",
+      "Beide sind identisch",
+      "'==' ist für Zahlen, equals() für Strings"
+    ],
+    correct: "'==' vergleicht Referenzen, equals() vergleicht Inhalte",
+    hint: "Für Objekte sollte equals() genutzt werden, um den tatsächlichen Inhalt zu vergleichen."
+  },
+  {
+    text: "22. Was versteht man unter Autoboxing in Java?",
+    options: [
+      "Automatisches Umwandeln von primitiven Datentypen in Wrapper-Objekte",
+      "Automatisches Kompilieren von Code",
+      "Automatisches Erstellen von Klassen",
+      "Automatisches Erben von Methoden"
+    ],
+    correct: "Automatisches Umwandeln von primitiven Datentypen in Wrapper-Objekte",
+    hint: "Autoboxing vereinfacht den Umgang mit primitiven Datentypen in Collections."
+  },
+  {
+    text: "23. Was sind Generics in Java?",
+    options: [
+      "Ein Mechanismus zur Erstellung von Klassen und Methoden, die mit beliebigen Datentypen arbeiten",
+      "Ein spezieller Datentyp",
+      "Eine Art von Exception",
+      "Ein GUI-Element"
+    ],
+    correct: "Ein Mechanismus zur Erstellung von Klassen und Methoden, die mit beliebigen Datentypen arbeiten",
+    hint: "Generics erhöhen die Typsicherheit und Wiederverwendbarkeit des Codes."
+  },
+  {
+    text: "24. Was ist ein Lambda-Ausdruck in Java?",
+    options: [
+      "Eine anonyme Funktion, die eine Methode implementiert",
+      "Ein Datentyp",
+      "Ein Schlüsselwort",
+      "Eine Schleife"
+    ],
+    correct: "Eine anonyme Funktion, die eine Methode implementiert",
+    hint: "Lambda-Ausdrücke vereinfachen den Code, besonders bei funktionalen Interfaces."
+  },
+  {
+    text: "25. Was ist die Stream API in Java?",
+    options: [
+      "Ein Framework zur Verarbeitung von Collections in einem funktionalen Stil",
+      "Ein Netzwerkprotokoll",
+      "Ein GUI-Toolkit",
+      "Ein Datenbank-Framework"
+    ],
+    correct: "Ein Framework zur Verarbeitung von Collections in einem funktionalen Stil",
+    hint: "Streams ermöglichen Filter, Mapping und Reduktion von Daten."
+  },
+  {
+    text: "26. Was versteht man unter Multithreading in Java?",
+    options: [
+      "Die Ausführung mehrerer Threads gleichzeitig",
+      "Das Erstellen von Klassen",
+      "Das Verarbeiten von Exceptions",
+      "Das Einlesen von Dateien"
+    ],
+    correct: "Die Ausführung mehrerer Threads gleichzeitig",
+    hint: "Multithreading ermöglicht parallele Verarbeitung."
+  },
+  {
+    text: "27. Was ist Synchronisation in Java?",
+    options: [
+      "Die Kontrolle des Zugriffs auf gemeinsame Ressourcen in Multithreading-Umgebungen",
+      "Das Überschreiben von Methoden",
+      "Das Erstellen von Klassen",
+      "Die automatische Umwandlung von Datentypen"
+    ],
+    correct: "Die Kontrolle des Zugriffs auf gemeinsame Ressourcen in Multithreading-Umgebungen",
+    hint: "Synchronization verhindert Dateninkonsistenzen bei parallelem Zugriff."
+  },
+  {
+    text: "28. Was ist der Unterschied zwischen HashMap und Hashtable?",
+    options: [
+      "HashMap ist nicht synchronisiert, Hashtable schon",
+      "Hashtable ist nicht synchronisiert, HashMap schon",
+      "Beide sind synchronisiert",
+      "Beide sind nicht synchronisiert"
+    ],
+    correct: "HashMap ist nicht synchronisiert, Hashtable schon",
+    hint: "Hashtable ist thread-sicher, allerdings meist langsamer als HashMap."
+  },
+  {
+    text: "29. Was ist eine Collection in Java?",
+    options: [
+      "Ein Framework zur Verwaltung von Gruppen von Objekten",
+      "Ein spezieller Datentyp für Zahlen",
+      "Ein GUI-Toolkit",
+      "Ein Netzwerkprotokoll"
+    ],
+    correct: "Ein Framework zur Verwaltung von Gruppen von Objekten",
+    hint: "Collections umfassen Listen, Mengen und Karten."
+  },
+  {
+    text: "30. Was ist der Unterschied zwischen ArrayList und LinkedList?",
+    options: [
+      "ArrayList bietet schnellen zufälligen Zugriff, LinkedList ist besser für Einfügungen/Entfernungen",
+      "LinkedList bietet schnellen zufälligen Zugriff, ArrayList ist besser für Einfügungen/Entfernungen",
+      "Beide sind identisch",
+      "ArrayList ist synchronisiert, LinkedList nicht"
+    ],
+    correct: "ArrayList bietet schnellen zufälligen Zugriff, LinkedList ist besser für Einfügungen/Entfernungen",
+    hint: "Die interne Datenstruktur unterscheidet sich bei beiden Listenarten."
+  },
+  {
+    text: "31. Was bedeutet das Schlüsselwort 'final' in Java?",
+    options: [
+      "Eine Variable, deren Wert nach der Initialisierung nicht mehr geändert werden kann",
+      "Eine Methode, die überschrieben werden kann",
+      "Eine Klasse, die erweitert werden kann",
+      "Ein spezieller Datentyp"
+    ],
+    correct: "Eine Variable, deren Wert nach der Initialisierung nicht mehr geändert werden kann",
+    hint: "final verhindert, dass der Wert von Variablen oder Methoden modifiziert wird."
+  },
+  {
+    text: "32. Was bewirkt das Schlüsselwort 'static' in Java?",
+    options: [
+      "Ermöglicht den Zugriff auf Variablen oder Methoden ohne Instanzierung der Klasse",
+      "Macht Variablen unveränderlich",
+      "Kennzeichnet private Methoden",
+      "Ist ein Synonym für final"
+    ],
+    correct: "Ermöglicht den Zugriff auf Variablen oder Methoden ohne Instanzierung der Klasse",
+    hint: "static gehört zur Klasse, nicht zu einem Objekt."
+  },
+  {
+    text: "33. Was ist eine abstrakte Klasse in Java?",
+    options: [
+      "Eine Klasse, die nicht instanziiert werden kann und abstrakte Methoden enthalten kann",
+      "Eine Klasse, die immer instanziiert wird",
+      "Eine Schnittstelle",
+      "Eine Klasse mit nur statischen Methoden"
+    ],
+    correct: "Eine Klasse, die nicht instanziiert werden kann und abstrakte Methoden enthalten kann",
+    hint: "Abstrakte Klassen dienen als Basis für konkrete Unterklassen."
+  },
+  {
+    text: "34. Was ist eine anonyme Klasse in Java?",
+    options: [
+      "Eine Klasse ohne Namen, die direkt bei der Instanziierung definiert wird",
+      "Eine Klasse, die von keiner anderen Klasse erbt",
+      "Eine abstrakte Klasse",
+      "Eine Klasse, die keine Methoden hat"
+    ],
+    correct: "Eine Klasse ohne Namen, die direkt bei der Instanziierung definiert wird",
+    hint: "Anonyme Klassen werden häufig bei Event-Handlern verwendet."
+  },
+  {
+    text: "35. Was bedeutet das Schlüsselwort 'this' in Java?",
+    options: [
+      "Es verweist auf das aktuelle Objekt",
+      "Es verweist auf die aktuelle Klasse",
+      "Es ist ein Platzhalter für null",
+      "Es wird zum Importieren von Paketen verwendet"
+    ],
+    correct: "Es verweist auf das aktuelle Objekt",
+    hint: "this wird genutzt, um Instanzvariablen von lokalen Variablen zu unterscheiden."
+  },
+  {
+    text: "36. Was bedeutet das Schlüsselwort 'super' in Java?",
+    options: [
+      "Es verweist auf die übergeordnete Klasse",
+      "Es verweist auf das aktuelle Objekt",
+      "Es ruft einen Konstruktor auf",
+      "Es wird zum Importieren von Klassen verwendet"
+    ],
+    correct: "Es verweist auf die übergeordnete Klasse",
+    hint: "super wird oft genutzt, um auf Methoden oder Konstruktoren der Oberklasse zuzugreifen."
+  },
+  {
+    text: "37. Was ist ein Singleton-Muster?",
+    options: [
+      "Ein Entwurfsmuster, das sicherstellt, dass eine Klasse nur eine einzige Instanz hat",
+      "Ein Entwurfsmuster, das mehrere Instanzen einer Klasse erlaubt",
+      "Ein Fehler in Java",
+      "Ein Synchronisationsmechanismus"
+    ],
+    correct: "Ein Entwurfsmuster, das sicherstellt, dass eine Klasse nur eine einzige Instanz hat",
+    hint: "Singleton sorgt für eine globale, einzige Instanz der Klasse."
+  },
+  {
+    text: "38. Wie implementiert man typischerweise ein Singleton in Java?",
+    options: [
+      "Durch einen privaten Konstruktor und eine öffentliche statische Methode, die die Instanz zurückgibt",
+      "Durch einen öffentlichen Konstruktor",
+      "Durch das Erben von einer speziellen Singleton-Klasse",
+      "Durch die Verwendung von Interfaces"
+    ],
+    correct: "Durch einen privaten Konstruktor und eine öffentliche statische Methode, die die Instanz zurückgibt",
+    hint: "Diese Technik verhindert, dass außerhalb der Klasse Instanzen erzeugt werden."
+  },
+  {
+    text: "39. Was versteht man unter Dependency Injection?",
+    options: [
+      "Ein Entwurfsmuster, bei dem Abhängigkeiten von außen in eine Klasse eingespeist werden",
+      "Das direkte Erstellen von Objekten innerhalb einer Klasse",
+      "Das Überschreiben von Methoden",
+      "Das Synchronisieren von Threads"
+    ],
+    correct: "Ein Entwurfsmuster, bei dem Abhängigkeiten von außen in eine Klasse eingespeist werden",
+    hint: "DI fördert lose Kopplung und erleichtert das Testen."
+  },
+  {
+    text: "40. Was ist das Spring Framework?",
+    options: [
+      "Ein populäres Framework für die Entwicklung von Java-Webanwendungen",
+      "Eine Programmiersprache",
+      "Ein Datenbanksystem",
+      "Ein Betriebssystem"
+    ],
+    correct: "Ein populäres Framework für die Entwicklung von Java-Webanwendungen",
+    hint: "Spring bietet viele Module für Dependency Injection, MVC und mehr."
+  }
+];
+
+// Export oder Verwendung der mcQuestions-Variable in deinem Projekt
+console.log("Fragenbank geladen: " + mcQuestions.length + " Fragen.");
+
+
+    // Funktion zum Zufallsauswählen zwischen Rechenaufgabe und Multiple-Choice
+    function generateQuestion() {
+      // Leere vorherige Inhalte
+      document.getElementById("feedback").textContent = "";
+      document.getElementById("options").innerHTML = "";
+      document.getElementById("answer-input").value = "";
+      document.getElementById("answer-area").style.display = "none";
+      document.getElementById("submit-answer").style.display = "inline-block";
+      document.getElementById("next-question").style.display = "none";
+      
+      // Wenn Quiz beendet sein soll
+      if (questionCount >= maxQuestions) {
+        endQuiz();
+        return;
+      }
+
+      questionCount++;
+
+      // Zufällig entscheiden, welche Art Frage angezeigt wird
+      const type = Math.random() < 0.5 ? "arithmetic" : "multipleChoice";
+      if (type === "arithmetic") {
+        generateArithmeticQuestion();
+      } else {
+        generateMCQuestion();
+      }
+    }
+
+    // Generiert eine einfache Rechenaufgabe (Addition)
+    function generateArithmeticQuestion() {
+      let a = Math.floor(Math.random() * 20) + 1;
+      let b = Math.floor(Math.random() * 20) + 1;
+      currentQuestion = {
+        type: "arithmetic",
+        text: `Frage ${questionCount}: Was ist ${a} + ${b}?`,
+        answer: a + b
+      };
+      document.getElementById("question-text").textContent = currentQuestion.text;
+      document.getElementById("answer-area").style.display = "block";
+      document.getElementById("answer-input").focus();
+    }
+
+    // Generiert eine Multiple-Choice-Frage aus der Fragenbank
+    function generateMCQuestion() {
+      // Zufällige Auswahl einer Frage
+      const randomIndex = Math.floor(Math.random() * mcQuestions.length);
+      const question = mcQuestions[randomIndex];
+      currentQuestion = {
+        type: "multipleChoice",
+        text: `Frage ${questionCount}: ${question.text}`,
+        options: question.options,
+        correct: question.correct
+      };
+      document.getElementById("question-text").textContent = currentQuestion.text;
+      
+      // Erstelle Buttons für jede Option
+      const optionsDiv = document.getElementById("options");
+      currentQuestion.options.forEach(option => {
+        let btn = document.createElement("button");
+        btn.textContent = option;
+        btn.className = "option-btn";
+        btn.addEventListener("click", function() {
+          evaluateAnswer(option);
+        });
+        optionsDiv.appendChild(btn);
+      });
+      // Falls es eine Multiple-Choice-Frage ist, wird das Texteingabefeld ausgeblendet
+      document.getElementById("answer-area").style.display = "none";
+    }
+
+    // Evaluierung der Antwort (für beide Fragetypen)
+    function evaluateAnswer(userInput) {
+      let isCorrect = false;
+      if (currentQuestion.type === "arithmetic") {
+        // Bei Rechenaufgaben als Zahl vergleichen
+        isCorrect = parseInt(userInput) === currentQuestion.answer;
+      } else if (currentQuestion.type === "multipleChoice") {
+        isCorrect = userInput === currentQuestion.correct;
+      }
+      
+      if (isCorrect) {
+        document.getElementById("feedback").textContent = "Richtig!";
+        score++;
+        document.getElementById("score").textContent = score;
+      } else {
+        let correctAns = currentQuestion.type === "arithmetic" ? currentQuestion.answer : currentQuestion.correct;
+        document.getElementById("feedback").textContent = `Falsch! Die richtige Antwort ist: ${correctAns}`;
+      }
+      // Nach der Antwort wird der "Antwort absenden"-Button (bzw. Optionstasten) deaktiviert und "Nächste Frage" angezeigt.
+      document.getElementById("submit-answer").style.display = "none";
+      document.getElementById("next-question").style.display = "inline-block";
+    }
+
+    // Event-Listener für Freitextantworten (Arithmetic)
+    document.getElementById("submit-answer").addEventListener("click", function(){
+      const userAnswer = document.getElementById("answer-input").value;
+      if (userAnswer === "") return;
+      evaluateAnswer(userAnswer);
+    });
+
+    // Event-Listener für "Nächste Frage"
+    document.getElementById("next-question").addEventListener("click", function(){
+      generateQuestion();
+    });
+
+    // Event-Listener für Enter-Taste im Eingabefeld
+    document.getElementById("answer-input").addEventListener("keypress", function(e) {
+      if (e.key === "Enter") {
+        document.getElementById("submit-answer").click();
+      }
+    });
+
+    // Quiz beenden: Zeigt die Endpunktzahl und bietet einen Restart an
+    function endQuiz() {
+      document.getElementById("question-text").textContent = "Quiz beendet!";
+      document.getElementById("options").innerHTML = "";
+      document.getElementById("answer-area").style.display = "none";
+      document.getElementById("feedback").textContent = `Du hast ${score} von ${maxQuestions} Punkten erreicht.`;
+      document.getElementById("submit-answer").style.display = "none";
+      document.getElementById("next-question").style.display = "none";
+      document.getElementById("restart-quiz").style.display = "inline-block";
+    }
+
+    // Restart-Button-Listener
+    document.getElementById("restart-quiz").addEventListener("click", function(){
+      score = 0;
+      questionCount = 0;
+      document.getElementById("score").textContent = score;
+      document.getElementById("restart-quiz").style.display = "none";
+      generateQuestion();
+    });
+
+    // Startet das Quiz
+    generateQuestion();
+  </script>
+</body>
+</html>
